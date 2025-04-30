@@ -1,0 +1,13 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Egna overrides (valfritt) */
+body {
+  @apply bg-black text-white;
+  font-family: 'Segoe UI', sans-serif;
+}
+
+input[type="range"] {
+  @apply cursor-pointer;
+}
