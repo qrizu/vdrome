@@ -62,7 +62,7 @@ function Vechnics({ side }) {
 
   const handleMouseUp = () => {
     setIsDragging(false);
-    setTonearmAngle(0); // återställ till viloposition
+    setTonearmAngle(0);
   };
 
   const handleMouseMove = (e) => {
@@ -82,60 +82,61 @@ function Vechnics({ side }) {
             <img
               key={i}
               src={src}
-              className={`absolute top-0 left-0 w-full h-full z-${i}`}
+              className={`absolute top-0 left-0 w-full h-full z-${i} pointer-events-none`}
               alt="layer"
             />
           )
         )}
 
         {/* KLICKZONER */}
-        <div onClick={togglePlay} title="Start/Stop"
-          className="absolute z-50 border border-pink-600 bg-pink-400/20 text-[10px] flex items-center justify-center cursor-pointer"
-          style={{ left: "20px", top: "780px", width: "120px", height: "100px" }}>
-          startstop
-        </div>
-
-        <div onClick={() => setIsPowered(p => !p)} title="Power"
-          className="absolute z-50 border border-pink-600 bg-pink-400/20 text-[10px] flex items-center justify-center cursor-pointer"
-          style={{ left: "28px", top: "680px", width: "60px", height: "60px" }}>
-          onoff
-        </div>
-
-        <div onClick={() => setSpeed(33)} title="33 RPM"
-          className="absolute z-50 border border-pink-600 bg-pink-400/20 text-[10px] flex items-center justify-center cursor-pointer"
-          style={{ left: "153px", top: "840px", width: "50px", height: "30px" }}>
-          33rpm
-        </div>
-
-        <div onClick={() => setSpeed(45)} title="45 RPM"
-          className="absolute z-50 border border-pink-600 bg-pink-400/20 text-[10px] flex items-center justify-center cursor-pointer"
-          style={{ left: "217px", top: "840px", width: "50px", height: "30px" }}>
-          45rpm
-        </div>
-
-        <div onClick={() => setIsLightOn(l => !l)} title="Strobe light"
-          className="absolute z-50 border border-pink-600 bg-pink-400/20 text-[10px] flex items-center justify-center cursor-pointer"
-          style={{ left: "639px", top: "838px", width: "40px", height: "40px" }}>
-          light
-        </div>
-
-        <div onClick={() => setPitch(p => Math.min(p + 0.05, 2))} title="Pitch Up"
-          className="absolute z-50 border border-pink-600 bg-pink-400/20 text-[10px] flex items-center justify-center cursor-pointer"
-          style={{ left: "1048px", top: "610px", width: "50px", height: "50px" }}>
-          pitch
-        </div>
-
-        <div onClick={() => setPitch(1)} title="Reset Pitch"
-          className="absolute z-50 border border-pink-600 bg-pink-400/20 text-[10px] flex items-center justify-center cursor-pointer"
-          style={{ left: "964px", top: "700px", width: "40px", height: "40px" }}>
-          res
-        </div>
-
-        <div onClick={() => setPitch(p => p * 2)} title="Double Pitch"
-          className="absolute z-50 border border-pink-600 bg-pink-400/20 text-[10px] flex items-center justify-center cursor-pointer"
-          style={{ left: "1045px", top: "420px", width: "50px", height: "25px" }}>
-          x2
-        </div>
+        <div
+          onClick={togglePlay}
+          title="Start/Stop"
+          className="absolute z-50 cursor-pointer"
+          style={{ left: "20px", top: "780px", width: "120px", height: "100px" }}
+        />
+        <div
+          onClick={() => setIsPowered(p => !p)}
+          title="Power"
+          className="absolute z-50 cursor-pointer"
+          style={{ left: "28px", top: "680px", width: "60px", height: "60px" }}
+        />
+        <div
+          onClick={() => setSpeed(33)}
+          title="33 RPM"
+          className="absolute z-50 cursor-pointer"
+          style={{ left: "153px", top: "840px", width: "50px", height: "30px" }}
+        />
+        <div
+          onClick={() => setSpeed(45)}
+          title="45 RPM"
+          className="absolute z-50 cursor-pointer"
+          style={{ left: "217px", top: "840px", width: "50px", height: "30px" }}
+        />
+        <div
+          onClick={() => setIsLightOn(l => !l)}
+          title="Strobe light"
+          className="absolute z-50 cursor-pointer"
+          style={{ left: "639px", top: "838px", width: "40px", height: "40px" }}
+        />
+        <div
+          onClick={() => setPitch(p => Math.min(p + 0.05, 2))}
+          title="Pitch Up"
+          className="absolute z-50 cursor-pointer"
+          style={{ left: "1048px", top: "610px", width: "50px", height: "50px" }}
+        />
+        <div
+          onClick={() => setPitch(1)}
+          title="Reset Pitch"
+          className="absolute z-50 cursor-pointer"
+          style={{ left: "964px", top: "700px", width: "40px", height: "40px" }}
+        />
+        <div
+          onClick={() => setPitch(p => p * 2)}
+          title="Double Pitch"
+          className="absolute z-50 cursor-pointer"
+          style={{ left: "1045px", top: "420px", width: "50px", height: "25px" }}
+        />
 
         {/* TONEARM */}
         <img
