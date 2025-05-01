@@ -1,7 +1,8 @@
-// src/components/vechnics/Tonearm.jsx
 import tonearm from "../../assets/image/vechnics/player-tonearm.png";
 
 function Tonearm({
+  mouseX = 0,
+  mouseY = 0,
   side = "left",
   tonearmRef,
   tonearmAngle,
@@ -21,41 +22,40 @@ function Tonearm({
     const centerY = rect.top + 185;
   }
 
-    return (
-        <>
-        <div
-      onMouseMove={onMouseMove}
-      onMouseDown={onMouseDown}
-      onMouseUp={onMouseUp}
-      onMouseLeave={onMouseUp}
-      style={{
-            position: "absolute",
-            top,
-            left,
+  return (
+    <>
+      <div
+        onMouseMove={onMouseMove}
+        onMouseDown={onMouseDown}
+        onMouseUp={onMouseUp}
+        onMouseLeave={onMouseUp}
+        style={{
+          position: "absolute",
+          top,
+          left,
+          width: "186px",
+          height: "898px",
+          transform: `rotate(${tonearmAngle}deg)`,
+          transformOrigin,
+          transition: !animate || isDragging
+            ? "none"
+            : "transform 0.3s cubic-bezier(0.25, 1, 0.5, 1)",
+          pointerEvents: "all",
+          willChange: "transform"
+        }}
+      >
+        <img
+          src={tonearm}
+          ref={tonearmRef}
+          className={className}
+          style={{
             width: "186px",
             height: "898px",
-            transform: `rotate(${tonearmAngle}deg)`,
-            transformOrigin,
-            transition: !animate || isDragging
-              ? "none"
-              : "transform 0.3s cubic-bezier(0.25, 1, 0.5, 1)",
-            pointerEvents: "all",
-            willChange: "transform"
+            display: "block",
+            maxWidth: "none",
+            pointerEvents: "auto"
           }}
-        >
-
-        <img
-            src={tonearm}
-            ref={tonearmRef}
-                        className={className}
-            style={{
-                width: "186px",
-                height: "898px",
-                display: "block",
-                maxWidth: "none",
-                pointerEvents: "auto"
-            }}
-            alt="Tonearm" 
+          alt="Tonearm"
         />
 
         {/* Transform origin marker */}
@@ -72,10 +72,34 @@ function Tonearm({
             pointerEvents: "none"
           }}
         />
+
         {/* Tonearm angle overlay */}
-            <div className="absolute left-4 top-4 z-50 text-white bg-black/70 px-2 py-1 rounded text-sm font-mono">
-            Angle: {tonearmAngle.toFixed(1)}°
-            </div>
+        <div className="absolute left-4 top-4 z-50 text-white bg-black/70 px-2 py-1 rounded text-sm font-mono">
+          Angle: {tonearmAngle.toFixed(1)}°
+        </div>
+
+        {/* Mouse position marker (only while dragging) */}
+        {isDragging && tonearmRef?.current && (() => {
+          const rect = tonearmRef.current.getBoundingClientRect();
+          const localX = mouseX - rect.left;
+          const localY = mouseY - rect.top;
+          return (
+            <div
+            style={{
+              position: "absolute",
+              top: "185px",
+              left: "93px",
+              width: "8px",
+              height: "8px",
+              backgroundColor: "blue",
+              borderRadius: "50%",
+              zIndex: 9999,
+              pointerEvents: "none"
+            }}
+          />
+          );
+        })()}
+        
       </div>
     </>
   );

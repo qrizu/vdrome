@@ -12,6 +12,7 @@ import LightButtons from "./vechnics/LightButtons";
 import Tonearm from "./vechnics/Tonearm";
 
 function Vechnics({ side }) {
+  const [mousePos, setMousePos] = useState({ x: 0, y: 0 });
   const [isPlaying, setIsPlaying] = useState(false);
   const [track, setTrack] = useState(null);
   const [tonearmAngle, setTonearmAngle] = useState(0);
@@ -20,6 +21,7 @@ function Vechnics({ side }) {
   const [speed, setSpeed] = useState(33);
   const [isLightOn, setIsLightOn] = useState(false);
   const [pitch, setPitch] = useState(1);
+  const [rawAngle, setRawAngle] = useState(0);
 
   const tonearmRef = useRef(null);
   const audioRef = useRef(null);
@@ -69,23 +71,19 @@ function Vechnics({ side }) {
     if (!isDragging) return;
     const angle = getAngle(e);
     const clamped = Math.max(-35, Math.min(35, angle));
-    requestAnimationFrame(() => setTonearmAngle(clamped));
+    requestAnimationFrame(() => {
+      setTonearmAngle(clamped);
+      setRawAngle(angle);
+    });
   };
 
-  // ✅ Global mouse tracking to keep dragging even outside the tonearm area
   useEffect(() => {
-    if (isDragging) {
-      window.addEventListener("mousemove", handleMouseMove);
-      window.addEventListener("mouseup", handleMouseUp);
-    } else {
-      window.removeEventListener("mousemove", handleMouseMove);
-      window.removeEventListener("mouseup", handleMouseUp);
-    }
-    return () => {
-      window.removeEventListener("mousemove", handleMouseMove);
-      window.removeEventListener("mouseup", handleMouseUp);
+    const updateMouse = (e) => {
+      setMousePos({ x: e.clientX, y: e.clientY });
     };
-  }, [isDragging]);
+    window.addEventListener("mousemove", updateMouse);
+    return () => window.removeEventListener("mousemove", updateMouse);
+  }, []);
 
   return (
     <div className="relative inline-block">
@@ -114,6 +112,24 @@ function Vechnics({ side }) {
           onMouseUp={handleMouseUp}
           animate={!isDragging}
         />
+        
+        {/* Raw angle overlay */}
+        $1
+        {/* Mouse position marker */}
+        <div
+          style={{
+            position: "absolute",
+            top: `${Math.round(window.event?.clientY ?? 0)}px`,
+            left: `${Math.round(window.event?.clientX ?? 0)}px`,
+            width: "8px",
+            height: "8px",
+            backgroundColor: "lime",
+            borderRadius: "50%",
+            zIndex: 9999,
+            pointerEvents: "none"
+          }}
+        />
+
       </div>
 
       <div className="mt-4 flex flex-col items-center justify-center space-y-2">
