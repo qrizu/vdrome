@@ -11,7 +11,7 @@ function OnOffButton({ isPowered, togglePower }) {
       <img
         src={onoff}
         alt="Power Button"
-        className="w-full h-full object-contain pointer-events-none"
+        className="w-full h-full object-cover pointer-events-none"
       />
     </div>
   );

@@ -58,7 +58,7 @@ function Vechnics({ side }) {
   const handleMouseDown = (e) => {
     e.preventDefault();
     setIsDragging(true);
-};
+  };
 
   const handleMouseUp = () => {
     setIsDragging(false);
@@ -111,10 +111,16 @@ function Vechnics({ side }) {
           onMouseMove={handleMouseMove}
           onMouseUp={handleMouseUp}
           animate={!isDragging}
+          mouseX={mousePos.x}
+          mouseY={mousePos.y}
         />
-        
+
         {/* Raw angle overlay */}
-        $1
+
+        <div className="absolute left-4 top-12 z-50 text-white bg-purple-700/70 px-2 py-1 rounded text-sm font-mono">
+          Raw: {rawAngle.toFixed(1)}°
+        </div>
+
         {/* Mouse position marker */}
         <div
           style={{
