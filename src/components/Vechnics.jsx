@@ -13,7 +13,8 @@ import onoff from "../assets/image/vechnics/player-onoff.png";
 
 function Vechnics({ side, audioSettings }) {
   const [isPlaying, setIsPlaying] = useState(false);
-  const [track, setTrack] = useState(null);
+  const [isPlatterSpinning, setIsPlatterSpinning] = useState(false);
+    const [track, setTrack] = useState(null);
   const [tonearmAngle, setTonearmAngle] = useState(0);
   const [isDragging, setIsDragging] = useState(false);
   const [startAngle, setStartAngle] = useState(0);
@@ -26,6 +27,7 @@ function Vechnics({ side, audioSettings }) {
 
   const tonearmRef = useRef(null);
   const audioRef = useRef(null);
+  const playerRef = useRef(null);
 
   const togglePlay = () => {
     if (!track || !isPowered) return;
@@ -79,9 +81,9 @@ function Vechnics({ side, audioSettings }) {
   setIsPowered(newPower);
 
   if (newPower) {
+    setSpeed(33);
     setTimeout(() => {
       setIsLightOn(true);
-      setSpeed(33);
     }, 700); // wait for rotation to complete before lighting up
   } else {
     setIsLightOn(false);
@@ -97,21 +99,20 @@ function Vechnics({ side, audioSettings }) {
         <img src={background} className="absolute top-0 left-0 w-full h-full z-0 pointer-events-none" alt="background" />
           {isLightOn && (
   <div
-    className="absolute z-1 pointer-events-none"
+    className="absolute z-50 pointer-events-none"
     style={{
       left: "77px",
-      top: "701px",
+      top: "480px",
       width: "240px",
       height: "240px",
-      background: "conic-gradient(from 0deg at 0% 100%, rgba(255,0,0,0.45) 0deg, transparent 30deg)",
-      transform: "rotate(135deg)",
+      background: "conic-gradient(from 0deg at 0% 100%, rgba(255,0,0,0.45) 0deg, transparent 45deg)",
+      transform: "rotate(270deg)",
       filter: "blur(12px)",
       mixBlendMode: "screen",
     }}
   />
 )}
-        <img src={platter} className="absolute top-0 left-0 w-full h-full z-10 pointer-events-none" alt="platter" />
-}
+        <img id={`platter-${side}`} src={platter} className="absolute top-0 left-0 w-full h-full z-10 pointer-events-none" style={{ transformOrigin: '457px 443px' }} alt="platter" />
         <img src={startstop} className="absolute top-0 left-0 w-full h-full z-20 pointer-events-none" alt="startstop" />
         <img src={pitchImage} className="absolute top-0 left-0 w-full h-full z-30 pointer-events-none" alt="pitch" />
         <img src={knob} className="absolute top-0 left-0 w-full h-full z-40 pointer-events-none" alt="knob" />
@@ -123,7 +124,28 @@ function Vechnics({ side, audioSettings }) {
 
         {/* DEBUG ZONER */}
         <div onClick={handlePowerToggle} title="Power" className="absolute z-[99] cursor-pointer bg-red-500/30" style={{ left: "28px", top: "680px", width: "60px", height: "60px" }} />
-        <div onClick={togglePlay} title="Start/Stop" className={`absolute z-[98] cursor-pointer bg-blue-500/30 ${!isPowered ? "pointer-events-none opacity-50" : ""}`} style={{ left: "20px", top: "780px", width: "120px", height: "100px" }} />
+        <div
+          onClick={() => {
+            if (!isPowered) return;
+            togglePlay();
+            setIsPlatterSpinning((prev) => {
+  const newState = !prev;
+  if (newState && platter) {
+  const updatedSpeed = speed ?? 33;
+  const rate = (updatedSpeed === 45 ? 1.87 : 2.5) / pitch;
+  platter.style.animation = `spin-up ${rate}s linear infinite forwards`;
+    } else {
+    if (platter) {
+    platter.style.animation = `spin-out 1s ease-out forwards`;
+  }
+  }
+  return newState;
+});
+          }}
+          title="Start/Stop"
+          className={`absolute z-[98] cursor-pointer bg-blue-500/30 active:scale-95 transition-transform duration-150 ${!isPowered ? "pointer-events-none opacity-50" : ""}`}
+          style={{ left: "20px", top: "780px", width: "120px", height: "100px" }}
+        />
         <div onClick={() => setSpeed(33)} title="33 RPM" className={`absolute z-[97] cursor-pointer bg-yellow-500/30 ${!isPowered ? "pointer-events-none opacity-50" : ""}`} style={{ left: "153px", top: "840px", width: "50px", height: "30px" }} />
         <div onClick={() => setSpeed(45)} title="45 RPM" className={`absolute z-[97] cursor-pointer bg-yellow-300/30 ${!isPowered ? "pointer-events-none opacity-50" : ""}`} style={{ left: "217px", top: "840px", width: "50px", height: "30px" }} />
         <div onClick={() => setIsLightOn(l => !l)} title="Strobe light" className={`absolute z-[96] cursor-pointer bg-pink-500/30 ${!isPowered ? "pointer-events-none opacity-50" : ""}`} style={{ left: "639px", top: "838px", width: "40px", height: "40px" }} />
@@ -131,9 +153,7 @@ function Vechnics({ side, audioSettings }) {
         <div onClick={() => setPitch(1)} title="Reset Pitch" className={`absolute z-[94] cursor-pointer bg-green-300/30 ${!isPowered ? "pointer-events-none opacity-50" : ""}`} style={{ left: "964px", top: "700px", width: "40px", height: "40px" }} />
         <div onClick={() => setPitch(p => p * 2)} title="Double Pitch" className={`absolute z-[93] cursor-pointer bg-purple-500/30 ${!isPowered ? "pointer-events-none opacity-50" : ""}`} style={{ left: "1045px", top: "420px", width: "50px", height: "25px" }} />
 
-        <img
-          src={tonearm}
-          ref={tonearmRef}
+        <img src={tonearm} ref={tonearmRef} data-side={side}
           onMouseDown={handleMouseDown}
           onMouseUp={handleMouseUp}
           onMouseLeave={handleMouseUp}
@@ -156,10 +176,33 @@ function Vechnics({ side, audioSettings }) {
           Ladda upp låt:
           <input id="trackUpload" name="trackUpload" type="file" accept="audio/*" onChange={handleLoadTrack} className="text-white block mt-1" />
         </label>
-        {track && <audio ref={audioRef} src={track} />}
+        {track && <audio ref={audioRef} data-side={side} src={track} />}
       </div>
     </div>
   );
 }
 
 export default Vechnics;
+
+/* Tailwind animation (add to index.css or global CSS)
+@keyframes spin-up {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+@keyframes spin-out {
+  0% { transform: rotate(0deg); opacity: 1; }
+  100% { transform: rotate(90deg); opacity: 0.3; }
+}
+.animate-spin-out {
+  animation: spin-out 1s ease-out forwards;
+} */
+
+// Tailwind animation
+// Add this to your global CSS if not present:
+// @keyframes spin-slow {
+//   0% { transform: rotate(0deg); }
+//   100% { transform: rotate(360deg); }
+// }
+// .animate-spin-slow {
+//   animation: spin-slow 3s linear infinite;
+// }
