@@ -77,7 +77,7 @@ function Vechnics({ side }) {
   return (
     <div className="relative inline-block">
       <div className="relative w-[1154px] h-[898px]">
-        {[background, platter, startstop, rpm33, rpm45, redlight, pitchImage, knob, reset, speedx2, onoff].map(
+        {[background, platter, startstop, pitchImage, knob, onoff].map(
           (src, i) => (
             <img
               key={i}
