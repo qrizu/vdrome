@@ -114,31 +114,37 @@ export default function Vechnics() {
   useEffect(() => {
     const handleMouseMove = (e) => {
       if (!isDraggingPitch.current || !pitchRef.current) return;
+  
       const container = pitchRef.current.parentElement;
       const rect = container.getBoundingClientRect();
       const mouseY = e.clientY - rect.top;
-
-      const topPx = 474;
-      const bottomPx = 732;
-      const rangePx = bottomPx - topPx;
-
-      const clampedY = Math.min(Math.max(mouseY, topPx), bottomPx);
-      const value = 1 - (clampedY - topPx) / rangePx;
+  
+      const clampedY = Math.min(Math.max(mouseY, 0), rect.height);
+      const value = 1 - clampedY / rect.height;
+  
       setPitchValue(value);
+  
+      console.log('🖱️ Mus Y:', e.clientY);
+      console.log('📐 Inuti faderspår:', mouseY.toFixed(2));
+      console.log('📎 clampedY:', clampedY.toFixed(2));
+      console.log('🎚️ pitchValue:', value.toFixed(2));
     };
-
+  
     const stopDragging = () => {
+      if (isDraggingPitch.current) {
+        console.log('🛑 Slutade dra pitch');
+      }
       isDraggingPitch.current = false;
     };
-
+  
     window.addEventListener('mousemove', handleMouseMove);
     window.addEventListener('mouseup', stopDragging);
+  
     return () => {
       window.removeEventListener('mousemove', handleMouseMove);
       window.removeEventListener('mouseup', stopDragging);
     };
   }, []);
-
   return (
     <div
       className="relative aspect-[1154/898] w-[43.32%] bg-no-repeat bg-contain bg-bottom"
