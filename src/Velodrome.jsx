@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import Vechnics from "./components/Vechnics";
 import Vone92 from "./components/Vone92";
 
@@ -16,13 +16,17 @@ const defaultDeck = {
 
 const defaultChannel = {
   gain: 0.7,
+  aux1: 0,
+  aux2: 0,
+  inputSource: "phono",
   hf: 0.5,
   hmf: 0.5,
   lmf: 0.5,
   lf: 0.5,
   volume: 0.8,
   filterOn: false,
-  filterBus: 1,
+  filterBus: 0,
+  xfadeBus: 0,
   cue: false,
 };
 
@@ -58,19 +62,41 @@ function deckStatus(deck) {
 export default function Velodrome() {
   const [deckA, setDeckA] = useState(defaultDeck);
   const [deckB, setDeckB] = useState(defaultDeck);
+  const [clockMs, setClockMs] = useState(0);
   const [mixer, setMixer] = useState({
-    channelA: defaultChannel,
-    channelB: defaultChannel,
+    channelA: { ...defaultChannel, xfadeBus: -1 },
+    channelB: { ...defaultChannel, xfadeBus: 1 },
     crossfader: 0.5,
     master: 0.8,
     booth: 0.6,
+    monitorPostEq: false,
+    monitorSplitCue: false,
+    monitorSource: "mix",
+    monitorCueMix: 0,
+    monitorMono: false,
+    monitorMute: false,
+    monitorLevel: 0.7,
     filter1Freq: 0.5,
     filter1Res: 0.35,
-    filter1Mode: "lpf",
+    filter1Modes: { hpf: false, bpf: false, lpf: true },
+    filter1LfoOn: false,
+    filter1LfoDepth: 0.5,
+    filter1LfoBpm: 120,
+    filter1LfoX2: false,
     filter2Freq: 0.5,
     filter2Res: 0.35,
-    filter2Mode: "hpf",
+    filter2Modes: { hpf: false, bpf: false, lpf: true },
+    filter2LfoOn: false,
+    filter2LfoDepth: 0.5,
+    filter2LfoBpm: 120,
+    filter2LfoX2: false,
+    midiRunning: false,
   });
+
+  useEffect(() => {
+    const timer = window.setInterval(() => setClockMs(performance.now()), 50);
+    return () => window.clearInterval(timer);
+  }, []);
 
   const updateDeck = (side, patch) => {
     const setter = side === "A" ? setDeckA : setDeckB;
@@ -80,14 +106,66 @@ export default function Velodrome() {
   const updateChannel = (side, patch) => {
     setMixer((prev) => {
       const channelKey = side === "A" ? "channelA" : "channelB";
+      const nextPatch = { ...patch };
+      if (Object.prototype.hasOwnProperty.call(nextPatch, "filterBus") && !Object.prototype.hasOwnProperty.call(nextPatch, "filterOn")) {
+        nextPatch.filterOn = Number(nextPatch.filterBus) !== 0;
+      }
+      if (Object.prototype.hasOwnProperty.call(nextPatch, "filterOn") && !nextPatch.filterOn && !Object.prototype.hasOwnProperty.call(nextPatch, "filterBus")) {
+        nextPatch.filterBus = 0;
+      }
       return {
         ...prev,
-        [channelKey]: { ...prev[channelKey], ...patch },
+        [channelKey]: { ...prev[channelKey], ...nextPatch },
       };
     });
   };
 
   const outputs = useMemo(() => {
+    const tSec = clockMs / 1000;
+    const filterConfig = (bus) => {
+      if (bus === 2) {
+        return {
+          freq: mixer.filter2Freq,
+          res: mixer.filter2Res,
+          modes: mixer.filter2Modes,
+          lfoOn: mixer.filter2LfoOn,
+          lfoDepth: mixer.filter2LfoDepth,
+          lfoBpm: mixer.filter2LfoBpm,
+          lfoX2: mixer.filter2LfoX2,
+        };
+      }
+      return {
+        freq: mixer.filter1Freq,
+        res: mixer.filter1Res,
+        modes: mixer.filter1Modes,
+        lfoOn: mixer.filter1LfoOn,
+        lfoDepth: mixer.filter1LfoDepth,
+        lfoBpm: mixer.filter1LfoBpm,
+        lfoX2: mixer.filter1LfoX2,
+      };
+    };
+
+    const filterGain = (cfg) => {
+      const hz = (cfg.lfoBpm / 60) * (cfg.lfoX2 ? 2 : 1);
+      const lfoWave = Math.sin(2 * Math.PI * hz * tSec);
+      const lfoOffset = cfg.lfoOn ? lfoWave * cfg.lfoDepth * 0.5 : 0;
+      const freq = clamp01(cfg.freq + lfoOffset);
+
+      const enabled = [];
+      if (cfg.modes?.hpf) enabled.push(0.2 + freq * 0.8);
+      if (cfg.modes?.bpf) enabled.push(0.28 + (1 - Math.abs(freq - 0.5) * 2) * 0.72);
+      if (cfg.modes?.lpf) enabled.push(0.28 + (1 - freq) * 0.72);
+
+      if (!enabled.length) return 1;
+
+      const avg = enabled.reduce((sum, v) => sum + v, 0) / enabled.length;
+      const resonance = 0.82 + cfg.res * 0.48;
+
+      // Approximates the all-pass interaction when all three filter types are selected.
+      if (enabled.length === 3) return (0.95 + (cfg.res - 0.5) * 0.1) * resonance;
+      return avg * resonance;
+    };
+
     const deckOutput = (deck, channel, side) => {
       const baseSpeed = deck.rpm;
       const pitchFactor = deck.resetLock ? 1 : 1 + (deck.pitch - 0.5) * 0.16;
@@ -101,26 +179,26 @@ export default function Velodrome() {
       const eqLmf = knobToEqLinear(channel.lmf);
       const eqLf = knobToEqLinear(channel.lf);
       const eqShape = 0.26 * eqHf + 0.24 * eqHmf + 0.24 * eqLmf + 0.26 * eqLf;
+      const source = normalizedSpeed * gain;
+      const postEq = source * eqShape;
       const fader = channel.volume ** 1.8;
 
-      let filterShape = 1;
-      if (channel.filterOn) {
-        const bus = channel.filterBus === 2
-          ? { freq: mixer.filter2Freq, res: mixer.filter2Res, mode: mixer.filter2Mode }
-          : { freq: mixer.filter1Freq, res: mixer.filter1Res, mode: mixer.filter1Mode };
-        const resShape = 0.8 + bus.res * 0.55;
-        if (bus.mode === "hpf") filterShape = (0.25 + bus.freq * 0.75) * resShape;
-        if (bus.mode === "bpf") filterShape = (0.5 + (1 - Math.abs(bus.freq - 0.5) * 2) * 0.5) * resShape;
-        if (bus.mode === "lpf") filterShape = (1 - bus.freq * 0.65) * resShape;
+      let filtered = postEq;
+      if (channel.filterOn && channel.filterBus > 0) {
+        filtered = postEq * filterGain(filterConfig(channel.filterBus));
       }
 
-      const signal = normalizedSpeed * gain * eqShape * fader * filterShape;
+      const postFader = filtered * fader;
+      const cueBase = mixer.monitorPostEq ? postEq : source;
 
       return {
         side,
         speed: targetRpm,
-        level: clamp01(signal),
-        cue: channel.cue ? clamp01(signal) : 0,
+        xfadeBus: Number.isFinite(channel.xfadeBus) ? channel.xfadeBus : (side === "A" ? -1 : 1),
+        level: clamp01(postFader),
+        aux1: clamp01(postFader * channel.aux1),
+        aux2: clamp01(postFader * channel.aux2),
+        cue: channel.cue ? clamp01(cueBase) : 0,
       };
     };
 
@@ -128,13 +206,36 @@ export default function Velodrome() {
     const b = deckOutput(deckB, mixer.channelB, "B");
     const leftWeight = Math.cos((mixer.crossfader * Math.PI) / 2);
     const rightWeight = Math.sin((mixer.crossfader * Math.PI) / 2);
-    const masterPre = a.level * leftWeight + b.level * rightWeight;
-    const master = clamp01(masterPre * (mixer.master ** 1.6));
-    const booth = clamp01(master * (mixer.booth ** 1.2));
-    const cue = clamp01(Math.max(a.cue, b.cue));
+    const xfadeApply = (level, bus) => {
+      if (bus === -1) return level * leftWeight;
+      if (bus === 1) return level * rightWeight;
+      return level;
+    };
 
-    return { a, b, master, booth, cue };
-  }, [deckA, deckB, mixer]);
+    const masterPre = xfadeApply(a.level, a.xfadeBus) + xfadeApply(b.level, b.xfadeBus);
+    const master = clamp01(masterPre * (mixer.master ** 1.6));
+    const boothRaw = clamp01(master * (mixer.booth ** 1.2));
+    const booth = mixer.monitorMute ? 0 : boothRaw;
+
+    const cueBus = clamp01(a.cue + b.cue);
+    const cueActive = cueBus > 0.0005;
+
+    let monitorProgram = master;
+    if (mixer.monitorSource === "aux1") monitorProgram = clamp01(a.aux1 + b.aux1);
+    if (mixer.monitorSource === "aux2") monitorProgram = clamp01(a.aux2 + b.aux2);
+
+    let phones;
+    if (mixer.monitorSplitCue) {
+      phones = cueActive ? Math.max(cueBus, monitorProgram) : monitorProgram;
+    } else if (cueActive) {
+      phones = cueBus * (1 - mixer.monitorCueMix) + monitorProgram * mixer.monitorCueMix;
+    } else {
+      phones = monitorProgram;
+    }
+    const cue = clamp01(phones * (mixer.monitorLevel ** 1.2));
+
+    return { a, b, master, booth, cue, cueActive, monitorProgram };
+  }, [deckA, deckB, mixer, clockMs]);
 
   return (
     <div className="velodrome-root">
@@ -153,6 +254,7 @@ export default function Velodrome() {
           <Vone92
             mixer={mixer}
             output={outputs}
+            clock={clockMs}
             onMixerUpdate={(patch) => setMixer((prev) => ({ ...prev, ...patch }))}
             onChannelUpdate={(side, patch) => updateChannel(side, patch)}
           />

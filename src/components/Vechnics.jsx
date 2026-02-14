@@ -21,9 +21,10 @@ function ClickZone({ className, onClick, disabled, active, children }) {
 }
 
 export default function Vechnics({ title, side, deck, onUpdate, level }) {
-  const TONEARM_ZERO = -54;
-  const TONEARM_MIN = -66;
-  const TONEARM_MAX = 44;
+  // Limit arm travel to realistic record arc: rest position -> near platter center.
+  const TONEARM_ZERO = 0;
+  const TONEARM_MIN = 0;
+  const TONEARM_MAX = 54;
 
   const [rotation, setRotation] = useState(0);
   const [rpmNow, setRpmNow] = useState(0);
