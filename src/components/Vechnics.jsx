@@ -1,292 +1,253 @@
-import React, { useState, useEffect, useRef } from 'react';
-import playerBg from '../assets/image/vechnics/player-background.png';
-import onOffImg from '../assets/image/vechnics/player-onoff.png';
-import startStopImg from '../assets/image/vechnics/player-startstop.png';
-import pitchImg from '../assets/image/vechnics/player-pitch.png';
-import platterImg from '../assets/image/vechnics/player-platter.png';
+import React, { useEffect, useMemo, useRef, useState } from "react";
+import playerBg from "../assets/image/vechnics/player-background.png";
+import onOffImg from "../assets/image/vechnics/player-onoff.png";
+import startStopImg from "../assets/image/vechnics/player-startstop.png";
+import pitchImg from "../assets/image/vechnics/player-pitch.png";
+import platterImg from "../assets/image/vechnics/player-platter.png";
+import tonearmImg from "../assets/image/vechnics/player-tonearm.png";
+import redActiveImg from "../assets/image/vechnics/player-redactive.png";
 
-const buttons = [
-  {
-    id: 'onoff',
-    img: onOffImg,
-    top: '75.83%',
-    left: '1.73%',
-    width: '6.06%',
-    height: '7.79%',
-  },
-  {
-    id: 'startstop',
-    img: startStopImg,
-    top: '86.86%',
-    left: '2.17%',
-    width: '9.71%',
-    height: '10.02%',
-  },
-  {
-    id: 'lightstrobe',
-    type: 'light',
-    top: '92.53%',
-    left: '55.80%',
-    width: '3.73%',
-    height: '4.79%',
-  },
-  {
-    id: 'pitch',
-    img: pitchImg,
-    left: '90.87%',
-    width: '3.99%',
-    height: '5.90%', // anpassat till 53px av 898px
-  },
-  { id: 'rpm33', top: '94.21%', left: '12.91%', width: '5.03%', height: '3.56%' },
-  { id: 'rpm45', top: '94.21%', left: '18.45%', width: '5.03%', height: '3.56%' },
-  { id: 'reset', top: '78.40%', left: '83.79%', width: '3.21%', height: '4.12%' },
-  { id: 'speedx2', top: '46.77%', left: '90.26%', width: '4.68%', height: '2.00%' },
-];
+function ClickZone({ className, onClick, disabled, active, children }) {
+  return (
+    <button
+      type="button"
+      className={`click-zone ${className} ${active ? "active" : ""}`}
+      onClick={onClick}
+      disabled={disabled}
+    >
+      {children}
+    </button>
+  );
+}
 
-export default function Vechnics() {
-  const [powerOn, setPowerOn] = useState(false);
-  const [isPlaying, setIsPlaying] = useState(false);
-  const [activeButtons, setActiveButtons] = useState({});
-  const [pitchValue, setPitchValue] = useState(0.5);
+export default function Vechnics({ title, side, deck, onUpdate, level }) {
+  const TONEARM_ZERO = -54;
+  const TONEARM_MIN = -66;
+  const TONEARM_MAX = 44;
 
-  const platterRef = useRef(null);
-  const actualSpeed = useRef(0);
-  const currentRotation = useRef(0);
-  const pitchRef = useRef(null);
-  const isDraggingPitch = useRef(false);
+  const [rotation, setRotation] = useState(0);
+  const [rpmNow, setRpmNow] = useState(0);
+  const [tonearmAngle, setTonearmAngle] = useState(TONEARM_ZERO);
+  const [tonearmDragging, setTonearmDragging] = useState(false);
+  const rpmRef = useRef(0);
+  const lastTs = useRef(performance.now());
+  const deckRef = useRef(null);
+  const draggingTonearm = useRef(false);
+  const dragStart = useRef({ pointerDeg: 0, armDeg: TONEARM_ZERO });
 
-  const handleButtonClick = (id) => {
-    if (id === 'onoff') {
-      setPowerOn((prev) => {
-        const newState = !prev;
-        if (newState) {
-          setActiveButtons({ rpm33: true, rpm45: false });
-        } else {
-          setActiveButtons({});
-          setIsPlaying(false);
-        }
-        return newState;
-      });
-    } else if (['rpm33', 'rpm45'].includes(id)) {
-      setActiveButtons((prev) => {
-        if (prev[id]) return prev;
-        return {
-          ...prev,
-          rpm33: id === 'rpm33',
-          rpm45: id === 'rpm45',
-        };
-      });
-    } else if (['reset', 'speedx2'].includes(id)) {
-      setActiveButtons((prev) => ({
-        ...prev,
-        [id]: !prev[id],
-      }));
-    } else if (id === 'startstop') {
-      if (powerOn) {
-        setIsPlaying((prev) => !prev);
-      }
-    }
-  };
+  const TONEARM_PIVOT_X = 0.826;
+  const TONEARM_PIVOT_Y = 0.232;
+  const TONEARM_WIDTH = 185 / 1154;
+  const TONEARM_ORIGIN_X = 0.53;
 
-    useEffect(() => {
-    let animationId;
-    let targetSpeed = 0;
-
-    if (powerOn && isPlaying) {
-      targetSpeed = activeButtons.rpm45 ? 2.5 : 1.8;
-    }
-
-    const animate = () => {
-      actualSpeed.current += (targetSpeed - actualSpeed.current) * 0.05;
-      currentRotation.current += actualSpeed.current;
-
-      if (platterRef.current) {
-        platterRef.current.style.transform = `rotate(${currentRotation.current}deg)`;
-      }
-
-      animationId = requestAnimationFrame(animate);
-    };
-
-    animationId = requestAnimationFrame(animate);
-    return () => cancelAnimationFrame(animationId);
-  }, [powerOn, isPlaying, activeButtons.rpm33, activeButtons.rpm45]);
+  const targetRpm = useMemo(() => {
+    if (!deck.powerOn || !deck.playing) return 0;
+    const base = deck.rpm;
+    const pitchFactor = deck.resetLock ? 1 : 1 + (deck.pitch - 0.5) * 0.16;
+    return base * pitchFactor * (deck.speedX2 ? 2 : 1);
+  }, [deck]);
 
   useEffect(() => {
-    const handleMouseMove = (e) => {
-      if (!isDraggingPitch.current || !pitchRef.current) return;
-  
-      const container = pitchRef.current.parentElement;
-      const rect = container.getBoundingClientRect();
-      const mouseY = e.clientY - rect.top;
-  
-      const clampedY = Math.min(Math.max(mouseY, 0), rect.height);
-      const value = 1 - clampedY / rect.height;
-  
-      setPitchValue(value);
-  
-      console.log('🖱️ Mus Y:', e.clientY);
-      console.log('📐 Inuti faderspår:', mouseY.toFixed(2));
-      console.log('📎 clampedY:', clampedY.toFixed(2));
-      console.log('🎚️ pitchValue:', value.toFixed(2));
+    let rafId;
+    const tick = (ts) => {
+      const dt = Math.max(0.001, (ts - lastTs.current) / 1000);
+      lastTs.current = ts;
+      const current = rpmRef.current;
+      const accelerating = targetRpm > current;
+      const tau = accelerating ? deck.startTime : deck.brakeTime;
+      const lerp = 1 - Math.exp(-dt / Math.max(0.05, tau));
+      const nextRpm = current + (targetRpm - current) * lerp;
+      rpmRef.current = nextRpm;
+      setRpmNow(nextRpm);
+      setRotation((prev) => (prev + nextRpm * 6 * dt) % 360);
+      rafId = requestAnimationFrame(tick);
     };
-  
-    const stopDragging = () => {
-      if (isDraggingPitch.current) {
-        console.log('🛑 Slutade dra pitch');
-      }
-      isDraggingPitch.current = false;
+    rafId = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(rafId);
+  }, [targetRpm, deck.startTime, deck.brakeTime]);
+
+  const disabled = !deck.powerOn;
+  const pitchPercent = Math.round((deck.pitch - 0.5) * 16 * 10) / 10;
+
+  const pointerAngle = (clientX, clientY) => {
+    if (!deckRef.current) return 0;
+    const rect = deckRef.current.getBoundingClientRect();
+    const pivotX = rect.left + rect.width * TONEARM_PIVOT_X;
+    const pivotY = rect.top + rect.height * TONEARM_PIVOT_Y;
+    const dx = clientX - pivotX;
+    const dy = clientY - pivotY;
+    return (Math.atan2(dy, dx) * 180) / Math.PI;
+  };
+
+  const normalizeDelta = (deg) => {
+    let delta = deg;
+    while (delta > 180) delta -= 360;
+    while (delta < -180) delta += 360;
+    return delta;
+  };
+
+  useEffect(() => {
+    const onMove = (e) => {
+      if (!draggingTonearm.current) return;
+      const currentPointer = pointerAngle(e.clientX, e.clientY);
+      const delta = normalizeDelta(currentPointer - dragStart.current.pointerDeg);
+      const next = Math.max(TONEARM_MIN, Math.min(TONEARM_MAX, dragStart.current.armDeg + delta));
+      setTonearmAngle(next);
     };
-  
-    window.addEventListener('mousemove', handleMouseMove);
-    window.addEventListener('mouseup', stopDragging);
-  
+    const onUp = () => {
+      draggingTonearm.current = false;
+      setTonearmDragging(false);
+    };
+    window.addEventListener("pointermove", onMove);
+    window.addEventListener("pointerup", onUp);
     return () => {
-      window.removeEventListener('mousemove', handleMouseMove);
-      window.removeEventListener('mouseup', stopDragging);
+      window.removeEventListener("pointermove", onMove);
+      window.removeEventListener("pointerup", onUp);
     };
   }, []);
+
   return (
-    <div
-      className="relative aspect-[1154/898] w-[43.32%] bg-no-repeat bg-contain bg-bottom"
-      style={{ backgroundImage: `url(${playerBg})` }}
-    >
-      {/* Platter */}
-      <div
-        ref={platterRef}
-        className="absolute"
-        style={{
-          top: '1.11%',
-          left: '2.17%',
-          width: '74.84%',
-          aspectRatio: '1 / 1',
-          transformOrigin: 'center center',
-        }}
-      >
-        <img
-          src={platterImg}
-          alt="Platter"
-          className="w-full h-full select-none"
-          draggable={false}
+    <section className="deck-image-wrap">
+      <header className="deck-headline">
+        <h2>{title}</h2>
+        <span>{rpmNow.toFixed(1)} RPM</span>
+      </header>
+
+      <div ref={deckRef} className="deck-image" style={{ backgroundImage: `url(${playerBg})` }}>
+        <div
+          className="platter-layer"
+          style={{
+            transform: `rotate(${rotation}deg)`,
+            opacity: deck.powerOn ? 1 : 0.92,
+          }}
+        >
+          <img src={platterImg} alt="platter" draggable={false} />
+        </div>
+        <div
+          className={`tonearm-layer ${tonearmDragging ? "dragging" : ""}`}
+          style={{
+            width: `${TONEARM_WIDTH * 100}%`,
+            left: `${(TONEARM_PIVOT_X - TONEARM_WIDTH * TONEARM_ORIGIN_X) * 100}%`,
+            transformOrigin: `${TONEARM_ORIGIN_X * 100}% ${TONEARM_PIVOT_Y * 100}%`,
+            transform: `rotate(${tonearmAngle}deg)`,
+          }}
+          onPointerDown={(e) => {
+            e.preventDefault();
+            if (e.currentTarget.setPointerCapture) {
+              e.currentTarget.setPointerCapture(e.pointerId);
+            }
+            draggingTonearm.current = true;
+            setTonearmDragging(true);
+            dragStart.current = {
+              pointerDeg: pointerAngle(e.clientX, e.clientY),
+              armDeg: tonearmAngle,
+            };
+          }}
+        >
+          <img src={tonearmImg} alt="tonearm" draggable={false} />
+        </div>
+        <ClickZone
+          className="zone-onoff"
+          active={deck.powerOn}
+          onClick={() => onUpdate({ powerOn: !deck.powerOn, playing: deck.powerOn ? false : deck.playing })}
+        >
+          <img src={onOffImg} alt="on off" draggable={false} style={{ transform: deck.powerOn ? "rotate(36deg)" : "none" }} />
+        </ClickZone>
+
+        <ClickZone
+          className="zone-startstop"
+          active={deck.playing && deck.powerOn}
+          disabled={disabled}
+          onClick={() => onUpdate({ playing: !deck.playing })}
+        >
+          <img src={startStopImg} alt="start stop" draggable={false} />
+        </ClickZone>
+
+        <ClickZone
+          className="zone-rpm33"
+          active={deck.rpm === 33}
+          disabled={disabled}
+          onClick={() => onUpdate({ rpm: 33 })}
+        />
+        <ClickZone
+          className="zone-rpm45"
+          active={deck.rpm === 45}
+          disabled={disabled}
+          onClick={() => onUpdate({ rpm: 45 })}
+        />
+        <ClickZone
+          className="zone-reset"
+          active={deck.resetLock}
+          disabled={disabled}
+          onClick={() => onUpdate({ resetLock: !deck.resetLock })}
+        />
+        <ClickZone
+          className="zone-x2"
+          active={deck.speedX2}
+          disabled={disabled}
+          onClick={() => onUpdate({ speedX2: !deck.speedX2 })}
+        />
+        <ClickZone
+          className="zone-light"
+          active={deck.lightOn}
+          disabled={disabled}
+          onClick={() => onUpdate({ lightOn: !deck.lightOn })}
+        />
+
+        <label className="zone-pitch" htmlFor={`pitch-${side}`}>
+          <img
+            src={pitchImg}
+            alt="pitch fader"
+            draggable={false}
+            style={{ top: `calc(${(1 - deck.pitch) * 84}%)` }}
+          />
+          <input
+            id={`pitch-${side}`}
+            type="range"
+            min="0"
+            max="1"
+            step="0.001"
+            value={deck.pitch}
+            disabled={disabled || deck.resetLock}
+            onChange={(e) => onUpdate({ pitch: Number(e.target.value) })}
+          />
+        </label>
+
+        {deck.powerOn && deck.lightOn && <div className="strobe-light" />}
+        {deck.powerOn && deck.rpm === 33 && <img className="led led-33" src={redActiveImg} alt="33 active" />}
+        {deck.powerOn && deck.rpm === 45 && <img className="led led-45" src={redActiveImg} alt="45 active" />}
+        {deck.powerOn && deck.resetLock && <img className="led led-reset" src={redActiveImg} alt="reset active" />}
+        {deck.powerOn && deck.speedX2 && <img className="led led-x2" src={redActiveImg} alt="x2 active" />}
+      </div>
+
+      <div className="deck-strip">
+        <span>PITCH {pitchPercent > 0 ? `+${pitchPercent}` : pitchPercent}%</span>
+        <span>START {deck.startTime.toFixed(1)}s</span>
+        <input
+          type="range"
+          min="0.2"
+          max="2.0"
+          step="0.1"
+          value={deck.startTime}
+          onChange={(e) => onUpdate({ startTime: Number(e.target.value) })}
+        />
+        <span>BRAKE {deck.brakeTime.toFixed(1)}s</span>
+        <input
+          type="range"
+          min="0.2"
+          max="3.0"
+          step="0.1"
+          value={deck.brakeTime}
+          onChange={(e) => onUpdate({ brakeTime: Number(e.target.value) })}
         />
       </div>
 
-      {/* Buttons */}
-      {buttons.map((btn) => (
-        <React.Fragment key={btn.id}>
-          {btn.id === 'onoff' && powerOn && (
-            <div
-              className="absolute rounded-full pointer-events-none"
-              style={{
-                top: '75.2%',
-                left: '1.2%',
-                width: '7.2%',
-                height: '8.6%',
-                background: 'radial-gradient(ellipse at center, rgba(255,0,0,0.25), transparent)',
-                boxShadow: '0 0 12px 4px rgba(255, 0, 0, 0.4)',
-                zIndex: 0,
-              }}
-            />
-          )}
-
-          {btn.type === 'light' ? (
-            powerOn && (
-              <div
-                onClick={() => handleButtonClick(btn.id)}
-                className="absolute rounded-full cursor-pointer transition-all duration-200"
-                style={{
-                  top: btn.top,
-                  left: btn.left,
-                  width: btn.width,
-                  height: btn.height,
-                  background:
-                    'radial-gradient(ellipse at center, #ffffcc, #ffeb3b)',
-                  boxShadow: '0 0 12px 4px rgba(255, 255, 200, 0.8)',
-                }}
-              />
-            )
-          ) : btn.id === 'pitch' ? (
-            <img
-              ref={pitchRef}
-              src={btn.img}
-              alt="pitch"
-              onMouseDown={() => (isDraggingPitch.current = true)}
-              className="absolute cursor-pointer select-none"
-              draggable={false}
-              style={{
-                left: btn.left,
-                width: btn.width,
-                height: btn.height,
-                top: `calc(${(1 - pitchValue) * 28.73 + 52.78}%)`,
-                transition: isDraggingPitch.current ? 'none' : 'top 0.05s linear',
-                pointerEvents: powerOn ? 'auto' : 'none',
-                opacity: 1,
-              }}
-            />
-          ) : (
-            <div
-              className={`absolute cursor-pointer transition-all duration-150 ${
-                btn.id === 'startstop' && isPlaying
-                  ? 'scale-95 translate-y-[1px] brightness-90 shadow-inner border-2 border-red-500 rounded'
-                  : 'scale-100 translate-y-0 brightness-100 shadow'
-              }`}
-              style={{
-                top: btn.top,
-                left: btn.left,
-                width: btn.width,
-                height: btn.height,
-                pointerEvents: btn.id === 'onoff' || powerOn ? 'auto' : 'none',
-                opacity: btn.id !== 'onoff' && !powerOn ? 0.3 : 1,
-              }}
-              onClick={() =>
-                btn.id === 'onoff' || powerOn
-                  ? handleButtonClick(btn.id)
-                  : undefined
-              }
-            >
-              {btn.img && (
-                <img
-                  src={btn.img}
-                  alt={btn.id}
-                  className="w-full h-full transition-transform duration-200"
-                  style={{
-                    transform:
-                      btn.id === 'onoff' && powerOn
-                        ? 'rotate(45deg)'
-                        : undefined,
-                    transformOrigin: 'center',
-                  }}
-                />
-              )}
-            </div>
-          )}
-        </React.Fragment>
-      ))}
-
-      {/* LED-dioder (endast när aktiva) */}
-      {['rpm33', 'rpm45', 'reset', 'speedx2'].map((id) => {
-        const isPressed = powerOn && activeButtons[id];
-        if (!isPressed) return null;
-
-        const styles = {
-          rpm33: { top: '95.33%', left: '15.60%' },
-          rpm45: { top: '95.33%', left: '21.49%' },
-          reset: { top: '69.82%', left: '88.21%' },
-          speedx2: { top: '47.44%', left: '92.88%' },
-        };
-
-        return (
-          <div
-            key={id}
-            className="absolute bg-red-500 rounded transition-all duration-150 scale-95 translate-y-[1px] brightness-90 shadow-inner"
-            style={{
-              top: styles[id].top,
-              left: styles[id].left,
-              width: '1.82%',
-              height: '0.67%',
-            }}
-          />
-        );
-      })}
-    </div>
+      <div className="deck-meter">
+        <span>CH {side}</span>
+        <div className="meter-track">
+          <div className="meter-fill" style={{ width: `${Math.round(level * 100)}%` }} />
+        </div>
+      </div>
+    </section>
   );
 }
